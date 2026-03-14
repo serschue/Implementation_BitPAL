@@ -78,12 +78,17 @@ void create_deltaVmax_shift(vector<uint64_t>& bit_vectors_delta_V_shift_curr,uin
 }
 
 // deltaHmax_shift
-uint64_t create_deltaHmax(vector<uint64_t>& bit_vectors_delta_H,vector<uint64_t>& bit_vectors_delta_V, uint64_t match){
+void create_deltaHmax(vector<uint64_t>& bit_vectors_delta_H_curr,vector<uint64_t>& bit_vectors_delta_H_prev, vector<uint64_t>& bit_vectors_delta_V_curr, uint64_t match){
     uint64_t Init_pos_max = 0;
     uint64_t deltaHmax = 0;
-    Init_pos_max = (bit_vectors_delta_H[0] << 1) & match;
-    deltaHmax = (Init_pos_max | (bit_vectors_delta_V.back() & (bit_vectors_delta_H[0] << 1)));
-    return deltaHmax;
+    Init_pos_max = bit_vectors_delta_H_prev[0] & match;
+    deltaHmax = (Init_pos_max | (bit_vectors_delta_V_curr.back() & bit_vectors_delta_H_prev[0]));
+    bit_vectors_delta_H_curr.back() = deltaHmax;
+    cout << "Hallo" << endl;
+    for (int j=0; j < 8; j++){
+        printBitPattern(bit_vectors_delta_H_curr[j]);
+    }
+    cout << "Hallo 2" << endl;
 }
 
 // deltaVhigh (algorithm 2 seen during the lecture) (mid+1 to max-1)
@@ -158,7 +163,7 @@ void create_deltaVmin(const vector<string>& sequences, vector<uint64_t>& bit_vec
     uint64_t deltaVmin_shift = 0;
     uint64_t all_ones = (1ULL << sequences[0].size()+1) - 1;
     uint64_t or_result = 0;
-    for (int i = 1; i < bit_vectors_delta_V_shift.size()-1; i++) {
+    for (int i = 1; i < bit_vectors_delta_V_shift.size(); i++) {
         or_result |= bit_vectors_delta_V_shift[i];
     }
     bit_vectors_delta_V_shift[0] = all_ones^(or_result);
@@ -169,7 +174,7 @@ void create_deltaHmin(const vector<string>& sequences, vector<uint64_t>& bit_vec
     uint64_t deltaHmin = 0;
     uint64_t all_ones = (1ULL << sequences[0].size()) - 1;
     uint64_t or_result = 0;
-    for (int i = 1; i < bit_vectors_delta_H.size() - 1; i++) {
+    for (int i = 1; i < bit_vectors_delta_H.size()-1; i++) {
         or_result |= bit_vectors_delta_H[i];
     }
     bit_vectors_delta_H[0] = all_ones^(or_result);
@@ -224,25 +229,6 @@ int main(){
             match = match_vectors[3];
         }
         cout << i << endl;
-        if (i > 0){
-            for (size_t t = 0; t < bit_vectors_delta_V_prev.size(); t++) {
-                bit_vectors_delta_V_prev[t] = bit_vectors_delta_V_shift_curr[t] >> 1;
-            }
-            // Set bit_vectors of delta_V_curr to zero
-            std::fill(bit_vectors_delta_V_shift_curr.begin(), bit_vectors_delta_V_shift_curr.end(), 0);
-
-            // Set bit_vectors of delta_H_curr to zero
-            std::fill(bit_vectors_delta_H_curr.begin(), bit_vectors_delta_H_curr.end(), 0);
-            create_deltaHmax(bit_vectors_delta_H_curr,bit_vectors_delta_V_prev,match);
-            for (int j=0; j < 8; j++){
-                printBitPattern(bit_vectors_delta_V_shift_curr[j]);
-            }
-            cout << "STOP" << endl;
-            create_deltaHhigh(bit_vectors_delta_H_curr, bit_vectors_delta_V_prev,match);
-            create_deltaHlow(bit_vectors_delta_V_prev,bit_vectors_delta_H_curr,match);
-            create_deltaHmin(sequences,bit_vectors_delta_H_curr);
-            bit_vectors_delta_H_prev = bit_vectors_delta_H_curr;
-        }
 
         create_deltaVmax_shift(bit_vectors_delta_V_shift_curr,bit_vectors_delta_H_prev[0], match);
         // Until here correct
@@ -251,12 +237,27 @@ int main(){
         create_deltaVmin(sequences,bit_vectors_delta_V_shift_curr);
         // I think until here correct
 
-        for (int k=0; k < 8; k++){
-            printBitPattern(bit_vectors_delta_V_shift_curr[k]);
+        
+            //bit_vectors_delta_V_prev = bit_vectors_delta_V_shift_curr;
+            //for (size_t t = 0; t < bit_vectors_delta_V_prev.size(); t++) {
+            //    bit_vectors_delta_V_prev[t] = bit_vectors_delta_V_shift_curr[t] >> 1;
+            //}
+            // Set bit_vectors of delta_V_curr to zero
+            //std::fill(bit_vectors_delta_V_shift_curr.begin(), bit_vectors_delta_V_shift_curr.end(), 0);
+
+            // Set bit_vectors of delta_H_curr to zero
+        std::fill(bit_vectors_delta_H_curr.begin(), bit_vectors_delta_H_curr.end(), 0);
+        create_deltaHmax(bit_vectors_delta_H_curr,bit_vectors_delta_H_prev,bit_vectors_delta_V_shift_curr,match);
+        for (int j=0; j < 8; j++){
+            printBitPattern(bit_vectors_delta_H_curr[j]);
         }
-        cout << "Iteration " << i << endl;
-        //printBitPattern(bit_vectors_delta_V_shift[7]);
-        //create_deltaVlow(bit_vectors_delta_V_shift, match);
+        cout << "STOP" << endl;            
+        create_deltaHhigh(bit_vectors_delta_H_curr, bit_vectors_delta_V_prev,match);
+        create_deltaHlow(bit_vectors_delta_V_prev,bit_vectors_delta_H_curr,match);
+        create_deltaHmin(sequences,bit_vectors_delta_H_curr);
+        bit_vectors_delta_H_prev = bit_vectors_delta_H_curr;
+        
+
     }
     //int global_alignment_score = calculate_global_alignment_score(sequences, bit_vectors_delta_H);
 }
