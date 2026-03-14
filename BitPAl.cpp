@@ -13,6 +13,7 @@ int I = -1;
 int G = -3; 
 
 int mid = I-G;
+int min = G;
 
 void read_fasta_file(const string& file_name, vector<string>& sequences){
     ifstream file(file_name.c_str());
@@ -68,12 +69,21 @@ void create_match_vectors(vector<uint64_t>& match_vectors, vector<string> sequen
 }
 
 // deltaVmax_shift (algorithm 1 seen during the lecture)
-uint64_t create_deltaVmax_shift(uint64_t deltaHmin, uint64_t match){
+void create_deltaVmax_shift(vector<uint64_t>& bit_vectors_delta_V_shift_curr,uint64_t deltaHmin, uint64_t match){
     uint64_t Init_pos_max = 0;
     uint64_t deltaVmax_shift = 0;
     Init_pos_max = deltaHmin & match;
     deltaVmax_shift = ((Init_pos_max + deltaHmin)^deltaHmin)^Init_pos_max;
-    return deltaVmax_shift;
+    bit_vectors_delta_V_shift_curr.back() = deltaVmax_shift;
+}
+
+// deltaHmax_shift
+uint64_t create_deltaHmax(vector<uint64_t>& bit_vectors_delta_H,vector<uint64_t>& bit_vectors_delta_V, uint64_t match){
+    uint64_t Init_pos_max = 0;
+    uint64_t deltaHmax = 0;
+    Init_pos_max = (bit_vectors_delta_H[0] << 1) & match;
+    deltaHmax = (Init_pos_max | (bit_vectors_delta_V.back() & (bit_vectors_delta_H[0] << 1)));
+    return deltaHmax;
 }
 
 // deltaVhigh (algorithm 2 seen during the lecture) (mid+1 to max-1)
@@ -85,13 +95,27 @@ void create_deltaVhigh(vector<uint64_t> bit_vectors_delta_H,vector<uint64_t>& bi
     for (int i = bit_vectors_delta_H.size() - 2; i > mid - G; i--){ // "V = max - 1 to "V=mid+1 (correct)
         uint64_t initpos = bit_vectors_delta_H[M-G-i] & deltaVmax_shift_or_match; // 1st term = max - the value of interest (correct)
         // Is not executed due to the choice of M/I and G
-        for (int j = bit_vectors_delta_H.size() - 2; j > i; i--){ // max-1 to the high value you are calculating
+        for (int j = bit_vectors_delta_H.size() - 2; j > i; j--){ // max-1 to the high value you are calculating
             uint64_t deltaVpos_shift_not_match = bit_vectors_delta_V_shift[j] & ~match; //1st term must be the shifted one!!
             initpos = initpos | (bit_vectors_delta_H[M-G-j] & deltaVpos_shift_not_match);
         }
         uint64_t deltaVshift = ((initpos << 1)+remaindeltaHmin)^remaindeltaHmin;
         uint64_t deltaVshift_not_match = deltaVshift & ~match;
         bit_vectors_delta_V_shift[i] =  deltaVshift_not_match;
+    }
+}
+
+// deltaHhigh (mid+1 to max-1)
+void create_deltaHhigh(vector<uint64_t> bit_vectors_delta_H,vector<uint64_t>& bit_vectors_delta_V, uint64_t match){ 
+    int k = 0;
+    for (int i = M-G-1; i > mid; i--){ // going from max - 1 = 3 to mid
+        k = 1;
+        uint64_t or_result = match & (bit_vectors_delta_H[k] << 1);
+        for (int j = M - G - 1; j > i - 1; j--){ 
+            or_result = or_result | ((bit_vectors_delta_H[k] << 1) &(bit_vectors_delta_V[j-G] & ~match));
+            k = k - 1;
+        }
+        bit_vectors_delta_H[i-G] =  or_result;
     }
 }
 
@@ -112,16 +136,43 @@ void create_deltaVlow(vector<uint64_t>& bit_vectors_delta_V_shift,const vector<u
     }
 }
 
+// deltaHlow
+void create_deltaHlow(vector<uint64_t>& bit_vectors_delta_V, const vector<uint64_t>& bit_vectors_delta_H, uint64_t match){
+    for (int i = mid; i > 0; i--){ // going from mid = 2 to min + 1
+        uint64_t or_result = match & (bit_vectors_delta_H[M-G - i] << 1); // max - the value you want to compute
+        int k = 1;
+        for (int j = 0; j < bit_vectors_delta_H.size(); j++){
+            if (j < mid + 1){
+                or_result = or_result | ((bit_vectors_delta_H[0] << 1) & (bit_vectors_delta_V[j] & ~match));
+            }
+            else{
+                or_result = or_result | ((bit_vectors_delta_H[k] << 1) & (bit_vectors_delta_V[j] & ~match));
+                k = k + 1;
+            }
+        }
+    }
+}
+
 // deltaVmin (algorithm 4 seen during the lecture)
-uint64_t create_deltaVmin(const vector<string>& sequences, const vector<uint64_t>& bit_vectors_delta_V){
-    uint64_t deltaHmin_shift = 0;
+void create_deltaVmin(const vector<string>& sequences, vector<uint64_t>& bit_vectors_delta_V_shift){
+    uint64_t deltaVmin_shift = 0;
+    uint64_t all_ones = (1ULL << sequences[0].size()+1) - 1;
+    uint64_t or_result = 0;
+    for (int i = 1; i < bit_vectors_delta_V_shift.size()-1; i++) {
+        or_result |= bit_vectors_delta_V_shift[i];
+    }
+    bit_vectors_delta_V_shift[0] = all_ones^(or_result);
+}
+
+// deltaHmin
+void create_deltaHmin(const vector<string>& sequences, vector<uint64_t>& bit_vectors_delta_H){
+    uint64_t deltaHmin = 0;
     uint64_t all_ones = (1ULL << sequences[0].size()) - 1;
     uint64_t or_result = 0;
-    for (int i = 1; i < bit_vectors_delta_V.size() - 1; i++) {
-        or_result |= bit_vectors_delta_V[i];
+    for (int i = 1; i < bit_vectors_delta_H.size() - 1; i++) {
+        or_result |= bit_vectors_delta_H[i];
     }
-    deltaHmin_shift = all_ones^(or_result);
-    return deltaHmin_shift;
+    bit_vectors_delta_H[0] = all_ones^(or_result);
 }
 
 int calculate_global_alignment_score(const vector<string>& sequences, const vector<uint64_t>& bit_vectors_delta_H){
@@ -144,17 +195,19 @@ int main(){
     vector<uint64_t> match_vectors(4,0); 
     create_match_vectors(match_vectors, sequences); 
 
-    vector<uint64_t> bit_vectors_delta_H(M-G-G+1,0);
-    vector<uint64_t> bit_vectors_delta_V_shift(M-G-G+1,0);
+    vector<uint64_t> bit_vectors_delta_H_prev(M-G-G+1,0);
+    vector<uint64_t> bit_vectors_delta_H_curr(M-G-G+1,0);
+    vector<uint64_t> bit_vectors_delta_V_prev(M-G-G+1,0);
+    vector<uint64_t> bit_vectors_delta_V_shift_curr(M-G-G+1,0);
 
     string horizontal_sequence = sequences[0];
     string vertical_sequence = sequences[1];
 
-    // Set delta_H_min
-    bit_vectors_delta_H[0] = (1ULL << horizontal_sequence.size()) - 1;
+    // Initalisation: set the bitvectors for delta_H_previous
+    bit_vectors_delta_H_prev[0] = (1ULL << horizontal_sequence.size()) - 1;
 
     // Iteration over the vertical sequence
-    for (int i = 0; i < vertical_sequence.size(); i++){
+    for (int i = 0; i < 2; i++){//vertical_sequence.size(); i++){
 
         // Set the correct match vector
         uint64_t match = 0;
@@ -170,12 +223,40 @@ int main(){
         else{
             match = match_vectors[3];
         }
+        cout << i << endl;
+        if (i > 0){
+            for (size_t t = 0; t < bit_vectors_delta_V_prev.size(); t++) {
+                bit_vectors_delta_V_prev[t] = bit_vectors_delta_V_shift_curr[t] >> 1;
+            }
+            // Set bit_vectors of delta_V_curr to zero
+            std::fill(bit_vectors_delta_V_shift_curr.begin(), bit_vectors_delta_V_shift_curr.end(), 0);
 
-        bit_vectors_delta_V_shift.back() = create_deltaVmax_shift(bit_vectors_delta_H[0], match);
+            // Set bit_vectors of delta_H_curr to zero
+            std::fill(bit_vectors_delta_H_curr.begin(), bit_vectors_delta_H_curr.end(), 0);
+            create_deltaHmax(bit_vectors_delta_H_curr,bit_vectors_delta_V_prev,match);
+            for (int j=0; j < 8; j++){
+                printBitPattern(bit_vectors_delta_V_shift_curr[j]);
+            }
+            cout << "STOP" << endl;
+            create_deltaHhigh(bit_vectors_delta_H_curr, bit_vectors_delta_V_prev,match);
+            create_deltaHlow(bit_vectors_delta_V_prev,bit_vectors_delta_H_curr,match);
+            create_deltaHmin(sequences,bit_vectors_delta_H_curr);
+            bit_vectors_delta_H_prev = bit_vectors_delta_H_curr;
+        }
+
+        create_deltaVmax_shift(bit_vectors_delta_V_shift_curr,bit_vectors_delta_H_prev[0], match);
         // Until here correct
-        create_deltaVhigh(bit_vectors_delta_H,bit_vectors_delta_V_shift,match);
-        printBitPattern(bit_vectors_delta_V_shift[7]);
-        create_deltaVlow(bit_vectors_delta_V_shift, match);
+        create_deltaVhigh(bit_vectors_delta_H_prev, bit_vectors_delta_V_shift_curr,match);
+        create_deltaVlow(bit_vectors_delta_V_shift_curr,bit_vectors_delta_H_prev,match);
+        create_deltaVmin(sequences,bit_vectors_delta_V_shift_curr);
+        // I think until here correct
+
+        for (int k=0; k < 8; k++){
+            printBitPattern(bit_vectors_delta_V_shift_curr[k]);
+        }
+        cout << "Iteration " << i << endl;
+        //printBitPattern(bit_vectors_delta_V_shift[7]);
+        //create_deltaVlow(bit_vectors_delta_V_shift, match);
     }
-    int global_alignment_score = calculate_global_alignment_score(sequences, bit_vectors_delta_H);
+    //int global_alignment_score = calculate_global_alignment_score(sequences, bit_vectors_delta_H);
 }
