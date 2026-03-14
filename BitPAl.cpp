@@ -78,14 +78,14 @@ uint64_t create_deltaVmax_shift(uint64_t deltaHmin, uint64_t match){
 
 // deltaVhigh (algorithm 2 seen during the lecture) (mid+1 to max-1)
 void create_deltaVhigh(vector<uint64_t> bit_vectors_delta_H,vector<uint64_t>& bit_vectors_delta_V_shift, uint64_t match){
-    uint64_t remaindeltaHmin = 0;
-    remaindeltaHmin = bit_vectors_delta_H[0]^(bit_vectors_delta_V_shift.back() >> 1); //klopt dit?
+    uint64_t remaindeltaHmin = bit_vectors_delta_H[0]^(bit_vectors_delta_V_shift.back() >> 1);
 
     uint64_t deltaVmax_shift_or_match = bit_vectors_delta_V_shift.back() | match;
 
-    for (int i = bit_vectors_delta_H.size() - 2; i > mid - G; i--){ // "V=max - 1 to "V=mid+1 (correct)
-        uint64_t initpos = bit_vectors_delta_H[M-G-i] & deltaVmax_shift_or_match; // 1st term = max - the value of interest
-        for (int j = bit_vectors_delta_H.size() - 3; j > i; i--){
+    for (int i = bit_vectors_delta_H.size() - 2; i > mid - G; i--){ // "V = max - 1 to "V=mid+1 (correct)
+        uint64_t initpos = bit_vectors_delta_H[M-G-i] & deltaVmax_shift_or_match; // 1st term = max - the value of interest (correct)
+        // Is not executed due to the choice of M/I and G
+        for (int j = bit_vectors_delta_H.size() - 2; j > i; i--){ // max-1 to the high value you are calculating
             uint64_t deltaVpos_shift_not_match = bit_vectors_delta_V_shift[j] & ~match; //1st term must be the shifted one!!
             initpos = initpos | (bit_vectors_delta_H[M-G-j] & deltaVpos_shift_not_match);
         }
@@ -93,26 +93,31 @@ void create_deltaVhigh(vector<uint64_t> bit_vectors_delta_H,vector<uint64_t>& bi
         uint64_t deltaVshift_not_match = deltaVshift & ~match;
         bit_vectors_delta_V_shift[i] =  deltaVshift_not_match;
     }
-} //Controleren
+}
 
 // deltaVlow (algorithm 3 seen during the lecture)
-void create_deltaVlow(vector<uint64_t> bit_vectors_delta_V_shift, uint64_t match){
+void create_deltaVlow(vector<uint64_t>& bit_vectors_delta_V_shift,const vector<uint64_t>& bit_vectors_delta_H, uint64_t match){
     uint64_t deltaVmax_shift_or_match = bit_vectors_delta_V_shift.back() | match;
-    uint64_t or_result = 0;
-    for (int i = mid - G - 1; i > 0; i--){ // "V = mid to "V = min + 1
-        for (int i = bit_vectors_delta_V_shift.size() - 2; i > mid - G - 1; i--){
-            or_result = or_result | bit_vectors_delta_V_shift[i];
+    uint64_t or_result = deltaVmax_shift_or_match;
+    for (int i = mid - G; i > 0; i--){ // "V = mid to "V = min + 1
+        uint64_t deltaVlow_shift = 0;
+        uint64_t a = 0;
+        for (int j = bit_vectors_delta_V_shift.size() - 2; j > i; j--){ // 1 + the value of the bitvector you are calculating
+            or_result = or_result | bit_vectors_delta_V_shift[j];
+            deltaVlow_shift = deltaVlow_shift | (bit_vectors_delta_H[j-a+2*G] & (bit_vectors_delta_V_shift[j]&~match)); //Nog een fout in bit_vectors_deltaH
         }
-        uint64_t deltaVnotmaxtomidplusoneshiftormatch = ~(deltaVmax_shift_or_match|or_result);
+        uint64_t deltaVnotmaxtomidplusoneshiftormatch = ~(or_result);
+        bit_vectors_delta_V_shift[i] = (deltaVlow_shift|(bit_vectors_delta_H[0] & deltaVnotmaxtomidplusoneshiftormatch)) << 1;
+
     }
-}// afwerken
+}
 
 // deltaVmin (algorithm 4 seen during the lecture)
-uint64_t create_deltaVmin(const vector<uint64_t>& bit_vectors_delta_V){
+uint64_t create_deltaVmin(const vector<string>& sequences, const vector<uint64_t>& bit_vectors_delta_V){
     uint64_t deltaHmin_shift = 0;
-    uint64_t all_ones = ~0ULL;
+    uint64_t all_ones = (1ULL << sequences[0].size()) - 1;
     uint64_t or_result = 0;
-    for (int i = G + 1; i <= M-G; i++) {
+    for (int i = 1; i < bit_vectors_delta_V.size() - 1; i++) {
         or_result |= bit_vectors_delta_V[i];
     }
     deltaHmin_shift = all_ones^(or_result);
