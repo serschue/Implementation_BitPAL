@@ -117,7 +117,7 @@ void create_deltaHhigh(vector<uint64_t>& bit_vectors_delta_H_prev,vector<uint64_
     }
 }
 
-// deltaVlow (algorithm 3 seen during the lecture)
+// deltaVlow (algorithm 3 seen during the lecture) (still an error in this one)
 void create_deltaVlow(vector<uint64_t>& bit_vectors_delta_V_shift,const vector<uint64_t>& bit_vectors_delta_H, uint64_t match){
     uint64_t deltaVmax_shift_or_match = bit_vectors_delta_V_shift.back() | match;
     uint64_t or_result = deltaVmax_shift_or_match;
