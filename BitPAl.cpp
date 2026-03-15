@@ -225,9 +225,11 @@ void printDeltaValues(const vector<uint64_t>& bit_vectors) {
     printf("\n");
 }
 
-int main(){
+int main(int argc, char* argv[]){
+    string fasta_file = argv[1];
+
     vector<string> sequences;
-    read_fasta_file("global_2.fasta", sequences);
+    read_fasta_file(fasta_file, sequences);
 
     vector<uint64_t> match_vectors(4,0); 
     create_match_vectors(match_vectors, sequences); 
@@ -281,4 +283,6 @@ int main(){
     }
     int global_alignment_score = calculate_global_alignment_score(sequences, bit_vectors_delta_H_prev);
     cout << "The global alignment score is: " << global_alignment_score << endl;
+
+    return 0;
 }
